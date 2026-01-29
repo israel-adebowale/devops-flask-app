@@ -6,7 +6,7 @@ pipeline {
         ECR_REPO_NAME = 'devops-flask-demo'
         IMAGE_TAG = "${GIT_COMMIT}"
         IMAGE_TAG_LATEST = "latest"
-        AWS_ACCOUNT_ID = '654654168319' // your AWS account ID
+        AWS_ACCOUNT_ID = '654654168319'
         ECR_LOGIN_URL = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
     }
 
@@ -23,9 +23,12 @@ pipeline {
         stage('Login to AWS ECR') {
             steps {
                 script {
-                    // Load external Groovy script and call the login function
-                    load 'scripts/scripts.groovy'
-                    loginToECR(AWS_REGION, ECR_LOGIN_URL)
+                    // Log in to AWS ECR using AWS CLI
+                    withAWS(credentials: 'aws-credentials-id') {
+                        sh """
+                            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_LOGIN_URL}
+                        """
+                    }
                 }
             }
         }
@@ -33,8 +36,12 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Build the Docker image using the external script
-                    buildDockerImage(ECR_REPO_NAME, IMAGE_TAG, IMAGE_TAG_LATEST)
+                    // Build Docker image
+                    sh """
+                        docker build -t ${ECR_REPO_NAME}:${IMAGE_TAG} .
+                        docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_LOGIN_URL}/${ECR_REPO_NAME}:${IMAGE_TAG}
+                        docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_LOGIN_URL}/${ECR_REPO_NAME}:${IMAGE_TAG_LATEST}
+                    """
                 }
             }
         }
@@ -42,8 +49,11 @@ pipeline {
         stage('Push Docker Image to ECR') {
             steps {
                 script {
-                    // Push the Docker image to ECR
-                    pushDockerImage(ECR_REPO_NAME, IMAGE_TAG, IMAGE_TAG_LATEST, ECR_LOGIN_URL)
+                    // Push Docker image to ECR
+                    sh """
+                        docker push ${ECR_LOGIN_URL}/${ECR_REPO_NAME}:${IMAGE_TAG}
+                        docker push ${ECR_LOGIN_URL}/${ECR_REPO_NAME}:${IMAGE_TAG_LATEST}
+                    """
                 }
             }
         }
@@ -51,8 +61,11 @@ pipeline {
         stage('Cleanup') {
             steps {
                 script {
-                    // Clean up local Docker images to save space
-                    cleanupDockerImages(ECR_REPO_NAME, IMAGE_TAG, IMAGE_TAG_LATEST, ECR_LOGIN_URL)
+                    // Optionally clean up local Docker images to save space
+                    sh """
+                        docker rmi ${ECR_LOGIN_URL}/${ECR_REPO_NAME}:${IMAGE_TAG}
+                        docker rmi ${ECR_LOGIN_URL}/${ECR_REPO_NAME}:${IMAGE_TAG_LATEST}
+                    """
                 }
             }
         }
@@ -60,6 +73,7 @@ pipeline {
 
     post {
         always {
+            // Cleanup or any final actions
             echo 'Pipeline finished'
         }
 
