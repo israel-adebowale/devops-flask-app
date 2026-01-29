@@ -24,7 +24,7 @@ pipeline {
             steps {
                 script {
                     // Load external Groovy script and call the login function
-                    load 'scripts.groovy'
+                    load 'scripts/script.groovy'
                     loginToECR(AWS_REGION, ECR_LOGIN_URL)
                 }
             }
