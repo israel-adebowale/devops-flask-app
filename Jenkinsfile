@@ -24,7 +24,7 @@ pipeline {
             steps {
                 script {
                     // Log in to AWS ECR using AWS CLI
-                    withAWS(credentials: 'jenkins_aws_key_ID') {
+                    withAWS(credentials: 'jenkins_aws_credentials') {
                         sh """
                             aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_LOGIN_URL}
                         """
